@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Zone Impulse Signals - Live</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background: #0e0e12;
+    color: #eee;
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 22px;
+    margin-bottom: 4px;
+    letter-spacing: 0.5px;
+  }
+  .sub {
+    text-align: center;
+    color: #888;
+    font-size: 13px;
+    margin-bottom: 24px;
+  }
+  #status {
+    text-align: center;
+    font-size: 12px;
+    margin-bottom: 20px;
+    color: #4caf50;
+  }
+  #status.offline { color: #f44336; }
+
+  .card {
+    max-width: 480px;
+    margin: 0 auto 18px auto;
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+    animation: slideIn 0.35s ease-out;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card.buy    { background: linear-gradient(135deg,#0f3d24,#123f2c); border: 1px solid #2ecc71; }
+  .card.sell   { background: linear-gradient(135deg,#3d0f14,#3f1219); border: 1px solid #e74c3c; }
+  .card.exit   { background: linear-gradient(135deg,#3d2f0f,#3f2f12); border: 1px solid #f39c12; }
+  .card.slhit  { background: linear-gradient(135deg,#2a0f0f,#2f1212); border: 1px solid #c0392b; }
+
+  .tag {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    margin-bottom: 10px;
+    letter-spacing: 0.5px;
+  }
+  .buy .tag   { background: #2ecc71; color: #06210f; }
+  .sell .tag  { background: #e74c3c; color: #2a0605; }
+  .exit .tag  { background: #f39c12; color: #2a1c04; }
+  .slhit .tag { background: #c0392b; color: #250505; }
+
+  .symbol { font-size: 20px; font-weight: 700; margin-bottom: 12px; }
+
+  .row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .row:last-child { border-bottom: none; }
+  .row .label { color: #999; }
+  .row .val { font-weight: 600; }
+
+  .time { font-size: 11px; color: #777; margin-top: 10px; text-align: right; }
+
+  #empty {
+    text-align: center;
+    color: #555;
+    margin-top: 60px;
+    font-size: 14px;
+  }
+
+  #gate {
+    position: fixed;
+    inset: 0;
+    background: #0e0e12;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+  }
+  #gate h2 { margin-bottom: 16px; font-size: 18px; }
+  #gate input {
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background: #1a1a20;
+    color: #fff;
+    font-size: 15px;
+    width: 220px;
+    text-align: center;
+    margin-bottom: 12px;
+  }
+  #gate button {
+    padding: 12px 24px;
+    border-radius: 8px;
+    border: none;
+    background: #2ecc71;
+    color: #06210f;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  #gateError { color: #e74c3c; font-size: 13px; margin-top: 10px; height: 16px; }
+  #app { display: none; }
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <h2>🔒 Enter access code</h2>
+  <input type="password" id="gateInput" placeholder="Access code" autocomplete="off">
+  <button onclick="checkGate()">Unlock</button>
+  <div id="gateError"></div>
+</div>
+
+<div id="app">
+<h1>⚡ Zone Impulse Signals</h1>
+<div class="sub">Live feed from TradingView</div>
+<div id="status">connecting...</div>
+<div id="feed"><div id="empty">Waiting for the next signal...</div></div>
+</div>
+
+<!-- Firebase SDKs (free CDN, no build tools needed) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+<script>
+  // ===== ACCESS CODE - change this to whatever you want to give subscribers =====
+  const ACCESS_CODE = "ZONE2026"; // <-- CHANGE THIS before sharing the link
+
+  function checkGate() {
+    const entered = document.getElementById("gateInput").value.trim();
+    if (entered === ACCESS_CODE) {
+      sessionStorage.setItem("zi_unlocked", "yes");
+      document.getElementById("gate").style.display = "none";
+      document.getElementById("app").style.display = "block";
+    } else {
+      document.getElementById("gateError").textContent = "Wrong code, try again.";
+    }
+  }
+
+  // Allow Enter key to submit
+  document.getElementById("gateInput").addEventListener("keyup", (e) => {
+    if (e.key === "Enter") checkGate();
+  });
+
+  // If already unlocked this session, skip the gate
+  if (sessionStorage.getItem("zi_unlocked") === "yes") {
+    document.getElementById("gate").style.display = "none";
+    document.getElementById("app").style.display = "block";
+  }
+
+  // ===== Your Firebase config (from Project Settings > Web App) =====
+  const firebaseConfig = {
+    apiKey: "AIzaSyDcolFHJHKwM4rWBhWl_mMyHnqWuDp6-tY",
+    authDomain: "buy-and-sell-indicator.firebaseapp.com",
+    databaseURL: "https://buy-and-sell-indicator-default-rtdb.firebaseio.com",
+    projectId: "buy-and-sell-indicator",
+    storageBucket: "buy-and-sell-indicator.firebasestorage.app",
+    messagingSenderId: "781038009110",
+    appId: "1:781038009110:web:0486e2397081c13466ee37"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  const feed = document.getElementById("feed");
+  const statusEl = document.getElementById("status");
+  const emptyEl = document.getElementById("empty");
+
+  // Connection status indicator
+  db.ref(".info/connected").on("value", (snap) => {
+    if (snap.val() === true) {
+      statusEl.textContent = "🟢 live";
+      statusEl.classList.remove("offline");
+    } else {
+      statusEl.textContent = "🔴 reconnecting...";
+      statusEl.classList.add("offline");
+    }
+  });
+
+  function cardClass(signal) {
+    if (signal.type === "OPTION_SIGNAL" && signal.action === "BUY") return "buy";
+    if (signal.type === "OPTION_SIGNAL" && signal.action === "SELL") return "sell";
+    if (signal.action === "SAFE_EXIT") return "exit";
+    if (signal.action === "SL_HIT") return "slhit";
+    return "exit";
+  }
+
+  function tagLabel(signal) {
+    if (signal.action === "BUY") return "BUY ENTRY";
+    if (signal.action === "SELL") return "SELL ENTRY";
+    if (signal.action === "SAFE_EXIT") return "SAFE EXIT";
+    if (signal.action === "SL_HIT") return "STOPLOSS HIT";
+    return signal.action || "SIGNAL";
+  }
+
+  function renderSignal(signal) {
+    emptyEl.remove();
+
+    const card = document.createElement("div");
+    card.className = "card " + cardClass(signal);
+
+    let rowsHtml = "";
+    if (signal.entry !== undefined) rowsHtml += `<div class="row"><span class="label">Entry</span><span class="val">₹${signal.entry}</span></div>`;
+    if (signal.sl !== undefined)    rowsHtml += `<div class="row"><span class="label">Stop Loss</span><span class="val">₹${signal.sl}</span></div>`;
+    if (signal.t1 !== undefined)    rowsHtml += `<div class="row"><span class="label">Target 1</span><span class="val">₹${signal.t1}</span></div>`;
+    if (signal.t2 !== undefined)    rowsHtml += `<div class="row"><span class="label">Target 2</span><span class="val">₹${signal.t2}</span></div>`;
+    if (signal.t3 !== undefined)    rowsHtml += `<div class="row"><span class="label">Target 3</span><span class="val">₹${signal.t3}</span></div>`;
+    if (signal.price !== undefined) rowsHtml += `<div class="row"><span class="label">Price</span><span class="val">₹${signal.price}</span></div>`;
+
+    card.innerHTML = `
+      <span class="tag">${tagLabel(signal)}</span>
+      <div class="symbol">${signal.symbol || "-"}</div>
+      ${rowsHtml}
+      <div class="time">${signal.time || ""}</div>
+    `;
+
+    feed.prepend(card);
+
+    // Keep only the last 20 cards on screen so the page doesn't grow forever
+    while (feed.children.length > 20) {
+      feed.removeChild(feed.lastChild);
+    }
+  }
+
+  // Listen for the single "latest" signal - fires every time it changes
+  db.ref("signals/latest").on("value", (snapshot) => {
+    const data = snapshot.val();
+    if (data) renderSignal(data);
+  });
+</script>
+
+</body>
+</html>
