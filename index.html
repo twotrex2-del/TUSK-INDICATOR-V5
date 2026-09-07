@@ -214,11 +214,18 @@
     return signal.action || "SIGNAL";
   }
 
-  function renderSignal(signal) {
-    emptyEl.remove();
+  function renderSignal(signal, symbolKey) {
+    if (!emptyEl.isConnected === false && emptyEl.parentNode) emptyEl.remove();
+
+    // Avoid re-rendering the exact same signal twice (Firebase fires on every listener attach too)
+    const signalId = symbolKey + "_" + (signal.time || "") + "_" + (signal.action || "");
+    if (cardsBySymbol[symbolKey] && cardsBySymbol[symbolKey].dataset.signalId === signalId) {
+      return;
+    }
 
     const card = document.createElement("div");
     card.className = "card " + cardClass(signal);
+    card.dataset.signalId = signalId;
 
     let rowsHtml = "";
     if (signal.entry !== undefined) rowsHtml += `<div class="row"><span class="label">Entry</span><span class="val">₹${signal.entry}</span></div>`;
@@ -227,6 +234,7 @@
     if (signal.t2 !== undefined)    rowsHtml += `<div class="row"><span class="label">Target 2</span><span class="val">₹${signal.t2}</span></div>`;
     if (signal.t3 !== undefined)    rowsHtml += `<div class="row"><span class="label">Target 3</span><span class="val">₹${signal.t3}</span></div>`;
     if (signal.price !== undefined) rowsHtml += `<div class="row"><span class="label">Price</span><span class="val">₹${signal.price}</span></div>`;
+    if (signal.strike !== undefined) rowsHtml += `<div class="row"><span class="label">Strike</span><span class="val">${signal.strike}</span></div>`;
 
     card.innerHTML = `
       <span class="tag">${tagLabel(signal)}</span>
@@ -236,6 +244,7 @@
     `;
 
     feed.prepend(card);
+    cardsBySymbol[symbolKey] = card;
 
     // Keep only the last 20 cards on screen so the page doesn't grow forever
     while (feed.children.length > 20) {
@@ -243,10 +252,17 @@
     }
   }
 
-  // Listen for the single "latest" signal - fires every time it changes
+  // Listen for the latest signal per-symbol - shows NIFTY and CRUDEOIL as separate, independently updating cards
+  const cardsBySymbol = {};
+
   db.ref("signals/latest").on("value", (snapshot) => {
     const data = snapshot.val();
-    if (data) renderSignal(data);
+    if (!data) return;
+
+    // data is now an object keyed by symbol, e.g. {NIFTY: {...}, CRUDEOIL: {...}}
+    Object.keys(data).forEach((symbol) => {
+      renderSignal(data[symbol], symbol);
+    });
   });
 </script>
 
